@@ -44,6 +44,8 @@ def upload_file():
     """
     if file.filename == "":
         return "Please select a file"
+    if not request.form['release_id']:
+        return "Release Id missing"
 
     if file and allowed_file(file.filename):
         now = datetime.datetime.today()
@@ -172,8 +174,9 @@ def make_batches(file, location):
         total_batches = list(divide_chunks(region_list, MAX_BATCH_SIZE))
         for i in range(total_no_of_batches):
             json_data = {
-                "release_id": request.form.get('release_id'),
-                "region_restricted": total_batches[i]
+                "release_id": int(request.form['release_id']),
+                "region_restricted": total_batches[i],
+                "action": request.form['operation']
             }
             f = open(location + '/batch_{}.json'.format(i + 1), 'w')
             f.write(str(json_data))

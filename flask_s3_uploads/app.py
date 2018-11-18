@@ -1,9 +1,11 @@
 """Application routes"""
 import csv
+import datetime
+import json
 import math
 import os.path
-import datetime
 import shutil
+import uuid
 
 from .configs import S3_BUCKET_NAME, S3_LOCATION, ALLOWED_FILE_EXTENSIONS, \
     UPLOAD_FOLDER, MAX_BATCH_SIZE
@@ -112,20 +114,19 @@ def upload_batch_to_s3(location):
     :param location: Local file path
     :return: S3 link otherwise exception
     """
+    uploaded_files = []
     try:
-        now = datetime.datetime.today()
-        date_time = now.strftime("%d%m%Y_%H%M%S")
-        folder_name = 'batch_{}'.format(date_time)
         for root, dirs, files in os.walk(location):
             for file in files:
                 if file.endswith(".json"):
-                    s3.upload_file(os.path.join(root, file), S3_BUCKET_NAME,
-                                   folder_name + '/' + file)
+                    s3.upload_file(
+                        os.path.join(root, file), S3_BUCKET_NAME, file)
+                    uploaded_files.append(str(file))
     except Exception as e:
         print("Something Happened on uploading Amazon S3: ", e)
         return e
 
-    return "{}{}".format(S3_LOCATION, folder_name)
+    return ["{}{}".format(S3_LOCATION, file) for file in uploaded_files]
 
 
 def upload_file_to_local(file, location='temp'):
@@ -158,6 +159,7 @@ def divide_chunks(l, n):
 def make_batches(file, location):
     """Make batches in JSON format
     :param file: file - CSV file to make batches
+    :param location: - File path to upload batches
     :return: Success message otherwise error
     """
     try:
@@ -174,12 +176,12 @@ def make_batches(file, location):
         total_batches = list(divide_chunks(region_list, MAX_BATCH_SIZE))
         for i in range(total_no_of_batches):
             json_data = {
-                "release_id": int(request.form['release_id']),
+                "release_id": request.form['release_id'],
                 "region_restricted": total_batches[i],
                 "action": request.form['operation']
             }
-            f = open(location + '/batch_{}.json'.format(i + 1), 'w')
-            f.write(str(json_data))
+            f = open(location + '/batch_{0}.json'.format(uuid.uuid4()), 'w')
+            f.write(json.dumps(json_data))
         return 'Batches created successfully.'
     except Exception as e:
         print("Something Happened while making batches: ", e)
